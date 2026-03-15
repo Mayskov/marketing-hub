@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabase-browser";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -16,16 +17,13 @@ export default function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/whatsapp-auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Login failed");
+      if (authError) {
+        setError(authError.message);
         return;
       }
 

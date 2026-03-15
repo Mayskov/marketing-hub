@@ -1,9 +1,9 @@
 "use client";
 
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
-// Browser Supabase client with anon key — used for auth and realtime in client components
-export const supabase = createClient(
+// Browser Supabase client — uses cookies so session is shared with server components
+export const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
