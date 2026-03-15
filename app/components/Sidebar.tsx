@@ -7,6 +7,8 @@ const navItems = [
   { href: "/", label: "Главная", icon: "⊞" },
   { href: "/create-ad", label: "Создать рекламу", icon: "📢" },
   { href: "/content-plan", label: "Контент-план", icon: "📅" },
+  { href: "/competitors", label: "Анализ конкурентов", icon: "🔍" },
+  { href: "/create-post", label: "Создать пост", icon: "📸" },
   { href: "/analytics", label: "Аналитика", icon: "📊" },
   { href: "/whatsapp-agent", label: "WhatsApp Агент", icon: "💬", external: true },
 ];
