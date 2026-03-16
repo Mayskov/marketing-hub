@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { ApifyClient } from "apify-client";
 
 export const dynamic = "force-dynamic";
+
+const APIFY_BASE = "https://api.apify.com/v2";
 
 interface ScrapedPost {
   caption: string;
@@ -36,23 +37,51 @@ export async function POST(request: Request) {
     const cleanHandle = handle.trim().replace(/^@/, "");
     const resultsLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
 
-    const client = new ApifyClient({ token });
-
-    const run = await client.actor("apify/instagram-scraper").call(
+    // Start the actor run via REST API
+    const runRes = await fetch(
+      `${APIFY_BASE}/acts/apify~instagram-scraper/runs?waitForFinish=120`,
       {
-        usernames: [cleanHandle],
-        resultsType: "posts",
-        resultsLimit,
-        addParentData: false,
-      },
-      { waitSecs: 120 }
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          usernames: [cleanHandle],
+          resultsType: "posts",
+          resultsLimit,
+          addParentData: false,
+        }),
+      }
     );
 
-    const { items } = await client
-      .dataset(run.defaultDatasetId)
-      .listItems();
+    if (!runRes.ok) {
+      const errBody = await runRes.text();
+      throw new Error(`Apify run failed (${runRes.status}): ${errBody}`);
+    }
 
-    const posts: ScrapedPost[] = items.map((item: Record<string, unknown>) => ({
+    const runData = await runRes.json();
+    const datasetId = runData.data?.defaultDatasetId;
+
+    if (!datasetId) {
+      throw new Error("No dataset ID returned from Apify run");
+    }
+
+    // Fetch dataset items
+    const datasetRes = await fetch(
+      `${APIFY_BASE}/datasets/${datasetId}/items?format=json`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (!datasetRes.ok) {
+      throw new Error(`Failed to fetch dataset (${datasetRes.status})`);
+    }
+
+    const items: Record<string, unknown>[] = await datasetRes.json();
+
+    const posts: ScrapedPost[] = items.map((item) => ({
       caption: (item.caption as string) || "",
       likesCount: (item.likesCount as number) || 0,
       commentsCount: (item.commentsCount as number) || 0,
