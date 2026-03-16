@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 type Screen = "form" | "preview" | "publishing" | "confirmation";
 
@@ -32,8 +32,12 @@ export default function CreatePostPage() {
   // Loading states
   const [isGeneratingText, setIsGeneratingText] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // File upload ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Result
   const [mediaId, setMediaId] = useState("");
@@ -82,6 +86,30 @@ export default function CreatePostPage() {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally {
       setIsGeneratingImage(false);
+    }
+  }
+
+  async function handleUploadImage(file: File) {
+    setError(null);
+    setIsUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/create-post/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка загрузки");
+
+      setImageUrl(data.imageUrl);
+      setImagePreview(data.preview);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка загрузки");
+    } finally {
+      setIsUploadingImage(false);
     }
   }
 
@@ -284,21 +312,57 @@ export default function CreatePostPage() {
                   alt="Preview"
                   className="w-full h-full object-cover"
                 />
-              ) : isGeneratingImage ? (
+              ) : isGeneratingImage || isUploadingImage ? (
                 <div className="text-center">
                   <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-3" />
                   <p className="text-zinc-500 text-sm">
-                    Генерация изображения...
+                    {isUploadingImage ? "Загрузка фото..." : "Генерация изображения..."}
                   </p>
                 </div>
               ) : (
                 <div className="text-center p-6">
                   <p className="text-4xl mb-2">🖼️</p>
                   <p className="text-zinc-500 text-sm">
-                    Нажмите кнопку ниже для генерации изображения
+                    Загрузите своё фото или сгенерируйте с помощью ИИ
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* Upload own photo */}
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUploadImage(file);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingImage}
+                className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              >
+                {isUploadingImage ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Загрузка...
+                  </span>
+                ) : (
+                  "📁 Загрузить своё фото"
+                )}
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 border-t border-zinc-700" />
+              <span className="text-xs text-zinc-500">или</span>
+              <div className="flex-1 border-t border-zinc-700" />
             </div>
 
             {/* Image prompt */}
