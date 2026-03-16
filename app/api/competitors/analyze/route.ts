@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOpenRouterClient, ANALYSIS_MODEL } from "../../../lib/openrouter";
+import Anthropic from "@anthropic-ai/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const client = getOpenRouterClient();
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "ANTHROPIC_API_KEY не настроен" },
+        { status: 500 }
+      );
+    }
+
+    const anthropic = new Anthropic({ apiKey });
 
     // Calculate average engagement for context
     const avgLikes =
@@ -84,13 +92,14 @@ ${JSON.stringify(
 Предложи 5-7 идей для контента, вдохновлённых тем что работает.
 Пиши на русском языке.`;
 
-    const response = await client.chat.completions.create({
-      model: ANALYSIS_MODEL,
+    const response = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
     });
 
-    let raw = response.choices[0]?.message?.content?.trim() || "";
+    let raw =
+      response.content[0].type === "text" ? response.content[0].text.trim() : "";
 
     // Strip markdown fences
     for (const fence of ["```json", "```"]) {
