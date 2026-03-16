@@ -22,6 +22,8 @@ try {
   // .env.local not found, skip
 }
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  serverExternalPackages: ["apify-client"],
+};
 
 export default nextConfig;
