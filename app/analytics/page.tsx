@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  generatePDFReport,
+  generateExcelReport,
+  type ReportData,
+  type PostRow,
+} from "@/app/lib/report-generator";
 
 interface CampaignData {
   id: string;
@@ -66,12 +72,34 @@ export default function AnalyticsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("All");
+  const [instaPosts, setInstaPosts] = useState<PostRow[]>([]);
 
-  const fetchData = async () => {
+  // Date range (default: last 30 days)
+  const today = new Date().toISOString().split("T")[0];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0];
+  const [dateFrom, setDateFrom] = useState(thirtyDaysAgo);
+  const [dateTo, setDateTo] = useState(today);
+
+  // Fetch Instagram posts for report
+  useEffect(() => {
+    fetch("/api/instagram-insights")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.posts) setInstaPosts(d.posts);
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/campaigns");
+      const params = new URLSearchParams();
+      if (dateFrom) params.set("since", dateFrom);
+      if (dateTo) params.set("until", dateTo);
+      const res = await fetch(`/api/campaigns?${params.toString()}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Не удалось загрузить данные");
       setData(json);
@@ -80,11 +108,57 @@ export default function AnalyticsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  const handleExportPDF = () => {
+    if (!data) return;
+    const reportData: ReportData = {
+      campaigns: data.campaigns.map((c) => ({
+        name: c.name,
+        status: c.status,
+        dailyBudget: c.dailyBudget,
+        spend: c.spend,
+        impressions: c.impressions,
+        clicks: c.clicks,
+        ctr: c.ctr,
+        cpc: c.cpc,
+        leads: c.leads,
+        costPerLead: c.costPerLead,
+      })),
+      totals: data.totals,
+      posts: instaPosts.length > 0 ? instaPosts : undefined,
+      dateFrom,
+      dateTo,
+    };
+    generatePDFReport(reportData);
+  };
+
+  const handleExportExcel = () => {
+    if (!data) return;
+    const reportData: ReportData = {
+      campaigns: data.campaigns.map((c) => ({
+        name: c.name,
+        status: c.status,
+        dailyBudget: c.dailyBudget,
+        spend: c.spend,
+        impressions: c.impressions,
+        clicks: c.clicks,
+        ctr: c.ctr,
+        cpc: c.cpc,
+        leads: c.leads,
+        costPerLead: c.costPerLead,
+      })),
+      totals: data.totals,
+      posts: instaPosts.length > 0 ? instaPosts : undefined,
+      dateFrom,
+      dateTo,
+    };
+    generateExcelReport(reportData);
+  };
 
   const filteredCampaigns =
     !data
@@ -109,6 +183,51 @@ export default function AnalyticsPage() {
         >
           {isLoading ? "Загрузка..." : "↻ Обновить"}
         </button>
+      </div>
+
+      {/* Date range + Export */}
+      <div className="flex flex-wrap items-center gap-4 mb-6 bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-zinc-400">С:</label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm rounded-lg px-3 py-1.5 focus:border-blue-500 outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-zinc-400">По:</label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm rounded-lg px-3 py-1.5 focus:border-blue-500 outline-none"
+          />
+        </div>
+        <button
+          onClick={fetchData}
+          disabled={isLoading}
+          className="px-3 py-1.5 bg-blue-600/20 border border-blue-500 text-blue-400 text-sm rounded-lg hover:bg-blue-600/30 transition-colors disabled:opacity-50"
+        >
+          Применить
+        </button>
+        <div className="ml-auto flex gap-2">
+          <button
+            onClick={handleExportPDF}
+            disabled={!data}
+            className="px-3 py-1.5 bg-red-600/20 border border-red-700 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition-colors disabled:opacity-50"
+          >
+            📄 Скачать PDF
+          </button>
+          <button
+            onClick={handleExportExcel}
+            disabled={!data}
+            className="px-3 py-1.5 bg-green-600/20 border border-green-700 text-green-400 text-sm rounded-lg hover:bg-green-600/30 transition-colors disabled:opacity-50"
+          >
+            📊 Скачать Excel
+          </button>
+        </div>
       </div>
 
       {error && (

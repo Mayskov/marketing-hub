@@ -39,6 +39,11 @@ export default function CreatePostPage() {
   // File upload ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Scheduling
+  const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("12:00");
+
   // Result
   const [mediaId, setMediaId] = useState("");
 
@@ -116,22 +121,39 @@ export default function CreatePostPage() {
   async function handlePublish() {
     setError(null);
     setIsPublishing(true);
-    setScreen("publishing");
+
+    if (publishMode === "now") {
+      setScreen("publishing");
+    }
 
     try {
-      const fullCaption = hashtags
-        ? `${caption}\n\n${hashtags}`
-        : caption;
+      const scheduledAt =
+        publishMode === "schedule" && scheduledDate
+          ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
+          : undefined;
 
-      const res = await fetch("/api/create-post/publish", {
+      const res = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl, caption: fullCaption }),
+        body: JSON.stringify({
+          topic,
+          angle,
+          format,
+          caption,
+          hashtags,
+          imageUrl,
+          imagePreview,
+          scheduledAt,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка публикации");
+      if (!res.ok) throw new Error(data.error || "Ошибка");
 
-      setMediaId(data.mediaId || "");
+      if (data.scheduled) {
+        setMediaId("");
+      } else {
+        setMediaId(data.mediaId || "");
+      }
       setScreen("confirmation");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
@@ -152,6 +174,9 @@ export default function CreatePostPage() {
     setImagePreview("");
     setImagePrompt("");
     setMediaId("");
+    setPublishMode("now");
+    setScheduledDate("");
+    setScheduledTime("12:00");
     setError(null);
   }
 
@@ -398,21 +423,77 @@ export default function CreatePostPage() {
           </div>
 
           {/* Bottom actions */}
-          <div className="lg:col-span-2 flex items-center gap-4 pt-4 border-t border-zinc-800">
-            <button
-              onClick={() => setScreen("form")}
-              className="text-zinc-400 hover:text-zinc-200 transition-colors"
-            >
-              ← Назад
-            </button>
-            <div className="flex-1" />
-            <button
-              onClick={handlePublish}
-              disabled={!caption || !imageUrl || isPublishing}
-              className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 disabled:text-zinc-500 text-white font-medium px-8 py-3 rounded-lg transition-all"
-            >
-              📸 Опубликовать в Instagram
-            </button>
+          <div className="lg:col-span-2 pt-4 border-t border-zinc-800 space-y-4">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setScreen("form")}
+                className="text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                ← Назад
+              </button>
+              <div className="flex-1" />
+
+              {/* Publish mode toggle */}
+              <div className="flex bg-zinc-800 border border-zinc-700 rounded-lg p-0.5">
+                <button
+                  onClick={() => setPublishMode("now")}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    publishMode === "now"
+                      ? "bg-blue-600 text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  Сейчас
+                </button>
+                <button
+                  onClick={() => setPublishMode("schedule")}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    publishMode === "schedule"
+                      ? "bg-blue-600 text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  📅 Запланировать
+                </button>
+              </div>
+            </div>
+
+            {/* Schedule date/time picker */}
+            {publishMode === "schedule" && (
+              <div className="flex items-center gap-3 justify-end">
+                <input
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
+                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                />
+                <input
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            )}
+
+            {/* Publish / Schedule button */}
+            <div className="flex justify-end">
+              <button
+                onClick={handlePublish}
+                disabled={
+                  !caption ||
+                  !imageUrl ||
+                  isPublishing ||
+                  (publishMode === "schedule" && !scheduledDate)
+                }
+                className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 disabled:text-zinc-500 text-white font-medium px-8 py-3 rounded-lg transition-all"
+              >
+                {publishMode === "schedule"
+                  ? "📅 Запланировать публикацию"
+                  : "📸 Опубликовать в Instagram"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -435,12 +516,14 @@ export default function CreatePostPage() {
       {/* CONFIRMATION SCREEN */}
       {screen === "confirmation" && (
         <div className="max-w-lg mx-auto text-center py-16">
-          <div className="text-6xl mb-4">✅</div>
+          <div className="text-6xl mb-4">{mediaId ? "✅" : "📅"}</div>
           <h2 className="text-2xl font-bold text-white mb-2">
-            Пост опубликован!
+            {mediaId ? "Пост опубликован!" : "Пост запланирован!"}
           </h2>
           <p className="text-zinc-400 mb-2">
-            Ваш пост успешно опубликован в Instagram
+            {mediaId
+              ? "Ваш пост успешно опубликован в Instagram"
+              : `Пост будет опубликован ${scheduledDate} в ${scheduledTime}`}
           </p>
           {mediaId && (
             <p className="text-zinc-500 text-sm mb-8">
@@ -463,12 +546,22 @@ export default function CreatePostPage() {
             )}
           </div>
 
-          <button
-            onClick={handleReset}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-8 py-3 rounded-lg transition-colors"
-          >
-            ✨ Создать ещё один пост
-          </button>
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={handleReset}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-8 py-3 rounded-lg transition-colors"
+            >
+              ✨ Создать ещё один пост
+            </button>
+            {!mediaId && (
+              <a
+                href="/calendar"
+                className="bg-zinc-700 hover:bg-zinc-600 text-white font-medium px-8 py-3 rounded-lg transition-colors"
+              >
+                📆 Открыть календарь
+              </a>
+            )}
+          </div>
         </div>
       )}
     </div>

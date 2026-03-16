@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 const API_VERSION = "v25.0";
 
-export async function GET() {
+export async function GET(request: Request) {
   const accessToken = process.env.META_ACCESS_TOKEN;
   const accountId = process.env.META_AD_ACCOUNT_ID;
 
@@ -31,11 +31,21 @@ export async function GET() {
 
     const campaigns = campaignsData.data || [];
 
-    // Fetch insights for each campaign (last 30 days)
+    // Parse optional date range
+    const { searchParams } = new URL(request.url);
+    const since = searchParams.get("since");
+    const until = searchParams.get("until");
+
+    let timeParam = "date_preset=last_30d";
+    if (since && until) {
+      timeParam = `time_range=${encodeURIComponent(JSON.stringify({ since, until }))}`;
+    }
+
+    // Fetch insights for each campaign
     const campaignsWithInsights = await Promise.all(
       campaigns.map(async (campaign: { id: string; name: string; status: string; objective: string; created_time: string; daily_budget?: string }) => {
         try {
-          const insightsUrl = `https://graph.facebook.com/${API_VERSION}/${campaign.id}/insights?fields=impressions,reach,clicks,cpc,cpm,ctr,spend,actions,cost_per_action_type&date_preset=last_30d&access_token=${accessToken}`;
+          const insightsUrl = `https://graph.facebook.com/${API_VERSION}/${campaign.id}/insights?fields=impressions,reach,clicks,cpc,cpm,ctr,spend,actions,cost_per_action_type&${timeParam}&access_token=${accessToken}`;
           const insightsRes = await fetch(insightsUrl);
           const insightsData = await insightsRes.json();
 

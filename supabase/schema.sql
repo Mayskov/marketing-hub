@@ -34,3 +34,59 @@ create policy "auth_read_messages" on messages
 -- Enable realtime
 alter publication supabase_realtime add table conversations;
 alter publication supabase_realtime add table messages;
+
+-- ============================================================
+-- Instagram Posts (scheduling + history)
+-- ============================================================
+create table if not exists posts (
+  id uuid primary key default gen_random_uuid(),
+  topic text,
+  angle text,
+  format text default 'фото-пост',
+  caption text not null,
+  hashtags text,
+  image_url text not null,
+  image_preview text,
+  status text not null default 'draft'
+    check (status in ('draft','scheduled','publishing','published','failed')),
+  scheduled_at timestamptz,
+  published_at timestamptz,
+  instagram_media_id text,
+  error_message text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_posts_status on posts(status);
+create index if not exists idx_posts_scheduled on posts(scheduled_at)
+  where status = 'scheduled';
+
+-- ============================================================
+-- A/B Tests
+-- ============================================================
+create table if not exists ab_tests (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text,
+  campaign_id text,
+  ad_set_id text,
+  status text not null default 'draft'
+    check (status in ('draft','active','completed')),
+  winner_variant_id uuid,
+  created_at timestamptz default now()
+);
+
+create table if not exists ab_test_variants (
+  id uuid primary key default gen_random_uuid(),
+  ab_test_id uuid not null references ab_tests(id) on delete cascade,
+  variant_label text not null,
+  primary_text text not null,
+  headline text not null,
+  call_to_action text not null,
+  image_base64 text,
+  meta_ad_id text,
+  meta_creative_id text,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_ab_variants_test on ab_test_variants(ab_test_id);
