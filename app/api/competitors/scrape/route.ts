@@ -47,9 +47,11 @@ export async function POST(request: Request) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          usernames: [cleanHandle],
+          directUrls: [`https://www.instagram.com/${cleanHandle}/`],
           resultsType: "posts",
           resultsLimit,
+          searchType: "hashtag",
+          searchLimit: 1,
           addParentData: false,
         }),
       }
