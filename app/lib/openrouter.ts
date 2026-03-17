@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 
 export const ANALYSIS_MODEL = "google/gemini-2.5-flash";
-export const CONTENT_MODEL = "anthropic/claude-sonnet-4-6";
+export const CONTENT_MODEL = "anthropic/claude-haiku-4.5";
 export const IMAGE_MODEL = "google/gemini-2.5-flash-image";
 
 export function getOpenRouterClient() {
