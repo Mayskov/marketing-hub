@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOpenRouterClient, CONTENT_MODEL } from "../../../lib/openrouter";
+import Anthropic from "@anthropic-ai/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const client = getOpenRouterClient();
+    const client = new Anthropic();
 
     const prompt = `Ты — эксперт по созданию контента для Instagram. Напиши пост на русском языке.
 
@@ -37,14 +37,14 @@ export async function POST(request: Request) {
   "hashtags": "#хештег1 #хештег2 #хештег3"
 }`;
 
-    const response = await client.chat.completions.create({
-      model: CONTENT_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
     });
 
-    let raw = response.choices[0]?.message?.content?.trim() || "";
+    let raw =
+      response.content[0].type === "text" ? response.content[0].text : "";
 
     // Strip markdown fences
     for (const fence of ["```json", "```"]) {
