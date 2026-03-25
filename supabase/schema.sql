@@ -1,7 +1,9 @@
--- WhatsApp Agent: conversations table
+-- Conversations table (WhatsApp + Instagram)
 create table if not exists conversations (
   id uuid primary key default gen_random_uuid(),
-  phone_number text unique not null,
+  phone_number text unique,
+  platform text not null default 'whatsapp',
+  ig_user_id text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -90,3 +92,24 @@ create table if not exists ab_test_variants (
 );
 
 create index if not exists idx_ab_variants_test on ab_test_variants(ab_test_id);
+
+-- ============================================================
+-- Instagram Polling: processed items tracking
+-- ============================================================
+create table if not exists ig_processed_items (
+  id uuid primary key default gen_random_uuid(),
+  item_type text not null check (item_type in ('comment', 'dm')),
+  ig_item_id text not null unique,
+  ig_media_id text,
+  ig_user_id text,
+  reply_text text,
+  status text not null default 'processed'
+    check (status in ('processed', 'skipped', 'failed')),
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_ig_processed_item on ig_processed_items(ig_item_id);
+
+-- Instagram conversation support
+create unique index if not exists idx_conversations_ig_user
+  on conversations(ig_user_id) where ig_user_id is not null;
